@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flagged Records — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="faculty"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+    <i class="fa-solid fa-shield-halved"></i>
+    <div class="small">These records scored <strong>Low Trust</strong> (below 50/100) based on QR validity, timing, and duplicate-scan checks. Review and approve or reject each one.</div>
+  </div>
+  <div class="card">
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Student</th><th>Subject</th><th>Date</th><th>Trust Score</th><th>Reason</th><th class="text-end">Action</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="6" class="text-center py-4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'flagged', title: 'Flagged Records' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadFlagged() {
+  try {
+    const res = await window.Api.get('/attendance/flagged');
+    const body = document.getElementById('tableBody');
+    if (!res.data.length) {
+      body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-shield-check"></i><p>No flagged records. All clear!</p></div></td></tr>';
+      return;
+    }
+    body.innerHTML = res.data.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.student_name)} <span class="text-secondary small">(${escapeHtml(r.roll_no)})</span></td>
+        <td>${escapeHtml(r.subject_name)}</td>
+        <td>${formatDateTime(r.marked_at)}</td>
+        <td><span class="badge-soft danger">${r.trust_score}/100</span></td>
+        <td class="small text-secondary">${escapeHtml(r.flag_reason || '-')}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-light-soft me-1" style="color:var(--success-500);" onclick="review(${r.id}, true)"><i class="fa-solid fa-check me-1"></i>Approve</button>
+          <button class="btn btn-sm btn-light-soft" style="color:var(--danger-500);" onclick="review(${r.id}, false)"><i class="fa-solid fa-xmark me-1"></i>Reject</button>
+        </td>
+      </tr>`).join('');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function review(recordId, approve) {
+  const comment = prompt(approve ? 'Optional approval note:' : 'Reason for rejection:');
+  try {
+    await window.Api.patch(`/attendance/flagged/${recordId}/review`, { approve, comment: comment || undefined });
+    showToast(approve ? 'Record approved' : 'Record rejected');
+    loadFlagged();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+window.review = review;
+loadFlagged();
+</script>
+</body>
+</html>

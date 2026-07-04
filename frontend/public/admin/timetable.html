@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Timetable — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="admin"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+      <div class="d-flex gap-2 flex-wrap">
+        <select class="form-select" id="deptFilter" style="max-width:220px;"><option value="">All Departments</option></select>
+        <select class="form-select" id="semFilter" style="max-width:160px;">
+          <option value="">All Semesters</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="addBtn"><i class="fa-solid fa-plus me-1"></i>Add Entry</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Day</th><th>Time</th><th>Subject</th><th>Faculty</th><th>Department</th><th>Room</th><th class="text-end">Actions</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="7" class="text-center py-4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<div class="modal fade" id="ttModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Add Timetable Entry</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="ttForm">
+        <div class="modal-body">
+          <input type="hidden" id="ttId">
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label">Subject</label><select class="form-select" id="fSubject" required></select></div>
+            <div class="col-12"><label class="form-label">Faculty</label><select class="form-select" id="fFaculty" required></select></div>
+            <div class="col-6"><label class="form-label">Department</label><select class="form-select" id="fDept" required></select></div>
+            <div class="col-6"><label class="form-label">Semester</label>
+              <select class="form-select" id="fSem" required></select>
+            </div>
+            <div class="col-6"><label class="form-label">Day</label>
+              <select class="form-select" id="fDay" required></select>
+            </div>
+            <div class="col-6"><label class="form-label">Room No</label><input type="text" class="form-control" id="fRoom"></div>
+            <div class="col-6"><label class="form-label">Start Time</label><input type="time" class="form-control" id="fStart" required></div>
+            <div class="col-6"><label class="form-label">End Time</label><input type="time" class="form-control" id="fEnd" required></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light-soft" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'timetable', title: 'Manage Timetable' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+const modal = new bootstrap.Modal(document.getElementById('ttModal'));
+let faculty = [], subjects = [];
+
+function populateStaticOptions() {
+  const semOpts = Array.from({ length: 8 }, (_, i) => `<option value="${i + 1}">Semester ${i + 1}</option>`).join('');
+  document.getElementById('semFilter').innerHTML += semOpts;
+  document.getElementById('fSem').innerHTML = semOpts;
+
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  document.getElementById('fDay').innerHTML = days
+    .map((d) => `<option value="${d}">${d[0].toUpperCase() + d.slice(1)}</option>`)
+    .join('');
+}
+populateStaticOptions();
+
+async function loadOptions() {
+  const [deptRes, facRes, subjRes] = await Promise.all([
+    window.Api.get('/departments', { limit: 100 }),
+    window.Api.get('/admin/faculty', { limit: 200 }),
+    window.Api.get('/subjects', { limit: 200 }),
+  ]);
+  const deptOpts = deptRes.data.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  document.getElementById('deptFilter').innerHTML += deptOpts;
+  document.getElementById('fDept').innerHTML = deptOpts;
+
+  faculty = facRes.data;
+  document.getElementById('fFaculty').innerHTML = faculty.map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join('');
+
+  subjects = subjRes.data;
+  document.getElementById('fSubject').innerHTML = subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} (${s.code})</option>`).join('');
+}
+
+async function loadTimetable() {
+  try {
+    const res = await window.Api.get('/timetable', {
+      department_id: document.getElementById('deptFilter').value,
+      semester: document.getElementById('semFilter').value,
+    });
+    const body = document.getElementById('tableBody');
+    if (!res.data.length) {
+      body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-calendar"></i><p>No timetable entries yet</p></div></td></tr>';
+      return;
+    }
+    body.innerHTML = res.data.map((t) => `
+      <tr>
+        <td class="text-capitalize">${t.day_of_week}</td>
+        <td>${formatTime(t.start_time)} - ${formatTime(t.end_time)}</td>
+        <td>${escapeHtml(t.subject_name)} <span class="text-secondary small">(${escapeHtml(t.subject_code)})</span></td>
+        <td>${escapeHtml(t.faculty_name)}</td>
+        <td>${escapeHtml(t.department_name)}</td>
+        <td>${escapeHtml(t.room_no || '-')}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-light-soft me-1" onclick='editEntry(${JSON.stringify(t)})'><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-sm btn-light-soft text-danger" onclick="deleteEntry(${t.id})"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`).join('');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function editEntry(t) {
+  document.getElementById('modalTitle').textContent = 'Edit Timetable Entry';
+  document.getElementById('ttId').value = t.id;
+  document.getElementById('fSubject').value = t.subject_id;
+  document.getElementById('fFaculty').value = t.faculty_id;
+  document.getElementById('fDept').value = t.department_id;
+  document.getElementById('fSem').value = t.semester;
+  document.getElementById('fDay').value = t.day_of_week;
+  document.getElementById('fRoom').value = t.room_no || '';
+  document.getElementById('fStart').value = t.start_time.slice(0,5);
+  document.getElementById('fEnd').value = t.end_time.slice(0,5);
+  modal.show();
+}
+
+async function deleteEntry(id) {
+  if (!confirm('Delete this timetable entry?')) return;
+  try {
+    await window.Api.delete(`/timetable/${id}`);
+    showToast('Timetable entry deleted');
+    loadTimetable();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  document.getElementById('ttForm').reset();
+  document.getElementById('ttId').value = '';
+  document.getElementById('modalTitle').textContent = 'Add Timetable Entry';
+  modal.show();
+});
+
+document.getElementById('ttForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('ttId').value;
+  const payload = {
+    subject_id: parseInt(document.getElementById('fSubject').value, 10),
+    faculty_id: parseInt(document.getElementById('fFaculty').value, 10),
+    department_id: parseInt(document.getElementById('fDept').value, 10),
+    semester: parseInt(document.getElementById('fSem').value, 10),
+    day_of_week: document.getElementById('fDay').value,
+    room_no: document.getElementById('fRoom').value.trim() || undefined,
+    start_time: document.getElementById('fStart').value,
+    end_time: document.getElementById('fEnd').value,
+  };
+  try {
+    if (id) {
+      await window.Api.put(`/timetable/${id}`, payload);
+      showToast('Timetable entry updated');
+    } else {
+      await window.Api.post('/timetable', payload);
+      showToast('Timetable entry created');
+    }
+    modal.hide();
+    loadTimetable();
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+document.getElementById('deptFilter').addEventListener('change', loadTimetable);
+document.getElementById('semFilter').addEventListener('change', loadTimetable);
+
+window.editEntry = editEntry;
+window.deleteEntry = deleteEntry;
+
+(async function init() {
+  await loadOptions();
+  await loadTimetable();
+})();
+</script>
+</body>
+</html>

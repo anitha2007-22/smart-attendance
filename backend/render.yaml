@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: smart-attendance-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: API_PREFIX
+        value: /api/v1
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: DB_HOST
+        fromDatabase:
+          name: smart-attendance-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: smart-attendance-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: smart-attendance-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: smart-attendance-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: smart-attendance-db
+          property: password
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      - key: QR_SECRET
+        generateValue: true
+      - key: QR_TOKEN_TTL_SECONDS
+        value: "30"
+      - key: ATTENDANCE_LATE_GRACE_MINUTES
+        value: "10"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX
+        value: "300"
+      - key: BCRYPT_SALT_ROUNDS
+        value: "10"
+
+databases:
+  - name: smart-attendance-db
+    plan: free
+    databaseName: smart_attendance
+    user: smart_attendance_user

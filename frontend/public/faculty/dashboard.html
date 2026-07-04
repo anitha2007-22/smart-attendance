@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Faculty Dashboard — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="faculty"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="stats-grid mb-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--brand-100);color:var(--brand-600);"><i class="fa-solid fa-chalkboard"></i></div>
+      <div><div class="stat-value" id="statClassesToday">-</div><div class="stat-label">Classes Today</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--warning-100);color:var(--warning-500);"><i class="fa-solid fa-flag"></i></div>
+      <div><div class="stat-value" id="statFlagged">-</div><div class="stat-label">Flagged Records</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--info-100);color:var(--info-500);"><i class="fa-solid fa-plane-departure"></i></div>
+      <div><div class="stat-value" id="statPendingLeave">-</div><div class="stat-label">Pending Leave Requests</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--success-100);color:var(--success-500);"><i class="fa-solid fa-book"></i></div>
+      <div><div class="stat-value" id="statSubjects">-</div><div class="stat-label">Subjects Assigned</div></div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>My Weekly Schedule</span>
+          <a href="/faculty/classes.html" class="small">View all &rarr;</a>
+        </div>
+        <div class="table-responsive-card">
+          <table class="table table-hover mb-0">
+            <thead><tr><th>Day</th><th>Time</th><th>Subject</th><th>Room</th><th></th></tr></thead>
+            <tbody id="scheduleBody"><tr><td colspan="5" class="text-center py-4">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Quick Start</div>
+        <div class="card-body d-flex flex-column gap-3">
+          <p class="text-secondary small mb-0">Start a new attendance session with a live rotating QR code for your currently scheduled class.</p>
+          <a href="/faculty/session.html" class="btn btn-primary"><i class="fa-solid fa-qrcode me-2"></i>Go to Attendance Session</a>
+          <a href="/faculty/flagged.html" class="btn btn-outline-secondary"><i class="fa-solid fa-flag me-2"></i>Review Flagged Records</a>
+          <a href="/faculty/leave.html" class="btn btn-outline-secondary"><i class="fa-solid fa-plane-departure me-2"></i>Review Leave Requests</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'dashboard', title: 'Faculty Dashboard' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadDashboard() {
+  try {
+    const schedule = await window.Api.get('/timetable/my-schedule');
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const todayCount = schedule.data.filter((s) => s.day_of_week === today).length;
+    document.getElementById('statClassesToday').textContent = todayCount;
+
+    const uniqueSubjects = new Set(schedule.data.map((s) => s.subject_id));
+    document.getElementById('statSubjects').textContent = uniqueSubjects.size;
+
+    const body = document.getElementById('scheduleBody');
+    if (!schedule.data.length) {
+      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-calendar"></i><p>No classes scheduled</p></div></td></tr>';
+    } else {
+      body.innerHTML = schedule.data.map((s) => `
+        <tr>
+          <td class="text-capitalize">${s.day_of_week}</td>
+          <td>${formatTime(s.start_time)} - ${formatTime(s.end_time)}</td>
+          <td>${escapeHtml(s.subject_name)} <span class="text-secondary small">(${escapeHtml(s.subject_code)})</span></td>
+          <td>${escapeHtml(s.room_no || '-')}</td>
+          <td>${s.day_of_week === today ? '<span class="badge-soft info">Today</span>' : ''}</td>
+        </tr>`).join('');
+    }
+  } catch (e) { showToast(e.message, 'error'); }
+
+  try {
+    const flagged = await window.Api.get('/attendance/flagged', { limit: 1 });
+    document.getElementById('statFlagged').textContent = flagged.data.length;
+  } catch (e) { /* ignore */ }
+
+  try {
+    const leave = await window.Api.get('/leave/pending');
+    document.getElementById('statPendingLeave').textContent = leave.data.length;
+  } catch (e) { /* ignore */ }
+}
+loadDashboard();
+</script>
+</body>
+</html>

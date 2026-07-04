@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Calendar — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+<style>
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-day-label { text-align: center; font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); padding: 6px 0; text-transform: uppercase; }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: var(--radius-sm); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;
+    border: 1px solid var(--border-color); background: var(--bg-surface-2); position: relative;
+  }
+  .cal-cell.empty { border: none; background: transparent; }
+  .cal-cell.present { background: var(--success-100); color: var(--success-500); border-color: transparent; }
+  .cal-cell.late { background: var(--warning-100); color: var(--warning-500); border-color: transparent; }
+  .cal-cell.absent { background: var(--danger-100); color: var(--danger-500); border-color: transparent; }
+  .cal-cell .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-top: 2px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="student"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <button class="btn btn-sm btn-light-soft" id="prevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="fw-bold" id="monthLabel">Month Year</span>
+      <button class="btn btn-sm btn-light-soft" id="nextBtn"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+    <div class="card-body">
+      <div class="d-flex gap-3 mb-3 flex-wrap">
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--success-100);border:1px solid var(--success-500);"></span>Present</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--warning-100);border:1px solid var(--warning-500);"></span>Late</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--danger-100);border:1px solid var(--danger-500);"></span>Absent</div>
+      </div>
+      <div class="cal-grid mb-1" id="dayLabelsGrid"></div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'calendar', title: 'Attendance Calendar' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+let viewDate = new Date();
+viewDate.setDate(1);
+
+document.getElementById('dayLabelsGrid').innerHTML = 'Sun,Mon,Tue,Wed,Thu,Fri,Sat'
+  .split(',')
+  .map((d) => `<div class="cal-day-label">${d}</div>`)
+  .join('');
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+async function loadCalendar() {
+  document.getElementById('monthLabel').textContent = `${MONTH_NAMES[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let recordsByDate = {};
+  try {
+    const res = await window.Api.get('/attendance/my-history');
+    res.data.forEach((r) => {
+      const d = new Date(r.session_date);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const key = d.getDate();
+        // Prioritize worst-case status if multiple sessions same day (absent > late > present)
+        const priority = { absent: 3, late: 2, present: 1 };
+        if (!recordsByDate[key] || priority[r.status] > priority[recordsByDate[key]]) {
+          recordsByDate[key] = r.status;
+        }
+      }
+    });
+  } catch (e) { showToast(e.message, 'error'); }
+
+  const grid = document.getElementById('calGrid');
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const status = recordsByDate[day];
+    const cls = status || '';
+    html += `<div class="cal-cell ${cls}">${day}${status ? '<span class="dot"></span>' : ''}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  viewDate.setMonth(viewDate.getMonth() - 1);
+  loadCalendar();
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  viewDate.setMonth(viewDate.getMonth() + 1);
+  loadCalendar();
+});
+
+loadCalendar();
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Reports — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="faculty"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card mb-4">
+    <div class="card-header">Overall Attendance Summary</div>
+    <div class="card-body">
+      <p class="text-secondary small">Download a consolidated attendance summary report for your assigned classes.</p>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" id="pdfBtn"><i class="fa-solid fa-file-pdf me-2"></i>Download PDF</button>
+        <button class="btn btn-outline-secondary" id="excelBtn"><i class="fa-solid fa-file-excel me-2"></i>Download Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Recent Sessions</div>
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Subject</th><th>Date</th><th>Status</th><th class="text-end">Download</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="4" class="text-center py-4 text-secondary">Start attendance sessions to see them listed here.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'reports', title: 'Attendance Reports' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+document.getElementById('pdfBtn').addEventListener('click', async () => {
+  try {
+    await window.Api.downloadFile('/reports/summary/pdf', {}, 'attendance-summary.pdf');
+    showToast('PDF report downloaded');
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+document.getElementById('excelBtn').addEventListener('click', async () => {
+  try {
+    await window.Api.downloadFile('/reports/summary/excel', {}, 'attendance-summary.xlsx');
+    showToast('Excel report downloaded');
+  } catch (e) { showToast(e.message, 'error'); }
+});
+</script>
+</body>
+</html>

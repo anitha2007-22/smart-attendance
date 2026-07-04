@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apply Leave — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="student"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header">Apply for Leave</div>
+        <div class="card-body">
+          <form id="leaveForm">
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" id="fFrom" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" id="fTo" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" id="fReason" rows="4" required placeholder="Briefly explain the reason for leave..."></textarea>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 mt-4"><i class="fa-solid fa-paper-plane me-2"></i>Submit Request</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header">My Leave Requests</div>
+        <div class="table-responsive-card">
+          <table class="table table-hover mb-0">
+            <thead><tr><th>From</th><th>To</th><th>Status</th></tr></thead>
+            <tbody id="tableBody"><tr><td colspan="3" class="text-center py-4">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'leave', title: 'Apply Leave' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadRequests() {
+  try {
+    const res = await window.Api.get('/leave/my-requests');
+    const body = document.getElementById('tableBody');
+    if (!res.data.length) {
+      body.innerHTML = '<tr><td colspan="3"><div class="empty-state"><i class="fa-solid fa-plane-departure"></i><p>No leave requests yet</p></div></td></tr>';
+      return;
+    }
+    body.innerHTML = res.data.map((r) => `
+      <tr>
+        <td>${formatDate(r.from_date)}</td>
+        <td>${formatDate(r.to_date)}</td>
+        <td>${statusBadge(r.status)}</td>
+      </tr>`).join('');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.getElementById('leaveForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const from_date = document.getElementById('fFrom').value;
+  const to_date = document.getElementById('fTo').value;
+  const reason = document.getElementById('fReason').value.trim();
+
+  try {
+    await window.Api.post('/leave', { from_date, to_date, reason });
+    showToast('Leave request submitted');
+    document.getElementById('leaveForm').reset();
+    loadRequests();
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+loadRequests();
+</script>
+</body>
+</html>

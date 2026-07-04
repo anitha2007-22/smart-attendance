@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="admin"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <ul class="nav nav-pills mb-3" id="rangeTabs">
+    <li class="nav-item"><button class="nav-link active" data-range="daily">Daily</button></li>
+    <li class="nav-item"><button class="nav-link" data-range="weekly">Weekly</button></li>
+    <li class="nav-item"><button class="nav-link" data-range="monthly">Monthly</button></li>
+  </ul>
+
+  <div class="card mb-4">
+    <div class="card-header">Attendance Trend</div>
+    <div class="card-body"><canvas id="trendChart" height="90"></canvas></div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Subject-wise Attendance</div>
+        <div class="card-body"><canvas id="subjectChart" height="120"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Department-wise Attendance</div>
+        <div class="card-body"><canvas id="deptChart" height="120"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Low Attendance Students (&lt; 75%)</div>
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Roll No</th><th>Name</th><th>Department</th><th>Present/Total</th><th>Percentage</th></tr></thead>
+        <tbody id="lowBody"><tr><td colspan="5" class="text-center py-4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'analytics', title: 'Analytics' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+let trendChartInstance = null;
+
+async function loadTrend(range = 'daily') {
+  const endpointMap = { daily: '/analytics/daily', weekly: '/analytics/weekly', monthly: '/analytics/monthly' };
+  const labelKeyMap = { daily: 'date', weekly: 'week_start', monthly: 'month_start' };
+  try {
+    const res = await window.Api.get(endpointMap[range]);
+    const labels = res.data.map((r) => formatDate(r[labelKeyMap[range]]));
+    const values = res.data.map((r) => r.percentage);
+
+    if (trendChartInstance) trendChartInstance.destroy();
+    trendChartInstance = new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Attendance %', data: values, borderColor: '#3b6df6', backgroundColor: 'rgba(59,109,246,0.12)', fill: true, tension: 0.35 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } },
+    });
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.querySelectorAll('#rangeTabs .nav-link').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#rangeTabs .nav-link').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadTrend(btn.dataset.range);
+  });
+});
+
+async function loadBreakdowns() {
+  try {
+    const subj = await window.Api.get('/analytics/subject-wise');
+    new Chart(document.getElementById('subjectChart'), {
+      type: 'bar',
+      data: { labels: subj.data.map((s) => s.code), datasets: [{ label: 'Attendance %', data: subj.data.map((s) => s.percentage), backgroundColor: '#3b6df6', borderRadius: 6 }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } },
+    });
+  } catch (e) { /* optional */ }
+
+  try {
+    const dept = await window.Api.get('/analytics/department-wise');
+    new Chart(document.getElementById('deptChart'), {
+      type: 'doughnut',
+      data: { labels: dept.data.map((d) => d.department_name), datasets: [{ data: dept.data.map((d) => d.percentage), backgroundColor: ['#3b6df6', '#16a34a', '#d97706', '#dc2626', '#0891b2'] }] },
+      options: { plugins: { legend: { position: 'bottom' } } },
+    });
+  } catch (e) { /* optional */ }
+
+  try {
+    const low = await window.Api.get('/analytics/low-attendance');
+    const body = document.getElementById('lowBody');
+    if (!low.data.length) {
+      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-face-smile"></i><p>No students below threshold</p></div></td></tr>';
+    } else {
+      body.innerHTML = low.data.map((s) => `
+        <tr>
+          <td>${escapeHtml(s.roll_no)}</td>
+          <td>${escapeHtml(s.name)}</td>
+          <td>${escapeHtml(s.department_name)}</td>
+          <td>${s.present}/${s.total}</td>
+          <td><span class="badge-soft danger">${s.percentage}%</span></td>
+        </tr>`).join('');
+    }
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+loadTrend('daily');
+loadBreakdowns();
+</script>
+</body>
+</html>

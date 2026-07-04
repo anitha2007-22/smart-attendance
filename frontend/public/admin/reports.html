@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="admin,faculty"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card">
+    <div class="card-header">Generate Attendance Summary Report</div>
+    <div class="card-body">
+      <p class="text-secondary small">Generates a student-wise attendance summary across the selected filters. Choose a format to download.</p>
+      <div class="row g-3 mb-3">
+        <div class="col-md-5">
+          <label class="form-label">Department (optional)</label>
+          <select class="form-select" id="fDept"><option value="">All Departments</option></select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Semester (optional)</label>
+          <select class="form-select" id="fSem">
+            <option value="">All Semesters</option>
+          </select>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" id="pdfBtn"><i class="fa-solid fa-file-pdf me-2"></i>Download PDF</button>
+        <button class="btn btn-outline-secondary" id="excelBtn"><i class="fa-solid fa-file-excel me-2"></i>Download Excel</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'reports', title: 'Reports' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadDepartments() {
+  try {
+    const res = await window.Api.get('/departments', { limit: 100 });
+    document.getElementById('fDept').innerHTML += res.data.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  } catch (e) { /* optional */ }
+  document.getElementById('fSem').innerHTML += Array.from({ length: 8 }, (_, i) => `<option value="${i + 1}">Semester ${i + 1}</option>`).join('');
+}
+
+function getFilters() {
+  return {
+    department_id: document.getElementById('fDept').value || undefined,
+    semester: document.getElementById('fSem').value || undefined,
+  };
+}
+
+document.getElementById('pdfBtn').addEventListener('click', async () => {
+  try {
+    await window.Api.downloadFile('/reports/summary/pdf', getFilters(), 'attendance-summary.pdf');
+    showToast('PDF report downloaded');
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+document.getElementById('excelBtn').addEventListener('click', async () => {
+  try {
+    await window.Api.downloadFile('/reports/summary/excel', getFilters(), 'attendance-summary.xlsx');
+    showToast('Excel report downloaded');
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+loadDepartments();
+</script>
+</body>
+</html>

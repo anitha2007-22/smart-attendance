@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Attendance — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="student"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+      <select class="form-select" id="subjectFilter" style="max-width:280px;">
+        <option value="">All Subjects</option>
+      </select>
+      <button class="btn btn-outline-secondary" id="downloadBtn"><i class="fa-solid fa-download me-2"></i>Download Report</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>Subject</th><th>Date</th><th>Time</th><th>Status</th><th>Method</th><th>Trust Level</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="6" class="text-center py-4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'attendance', title: 'My Attendance' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadSubjects() {
+  try {
+    const res = await window.Api.get('/analytics/my-subject-wise');
+    document.getElementById('subjectFilter').innerHTML += res.data.map((s) => `<option value="${s.subject_id}">${escapeHtml(s.subject_name)}</option>`).join('');
+  } catch (e) { /* optional */ }
+}
+
+async function loadHistory() {
+  const subject_id = document.getElementById('subjectFilter').value;
+  try {
+    const res = await window.Api.get('/attendance/my-history', { subject_id });
+    const body = document.getElementById('tableBody');
+    if (!res.data.length) {
+      body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-clipboard"></i><p>No attendance records found</p></div></td></tr>';
+      return;
+    }
+    body.innerHTML = res.data.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.subject_name)} <span class="text-secondary small">(${escapeHtml(r.subject_code)})</span></td>
+        <td>${formatDate(r.session_date)}</td>
+        <td>${formatTime(r.start_time)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td class="text-uppercase small text-secondary">${r.method}</td>
+        <td>${trustBadge(r.trust_level)}</td>
+      </tr>`).join('');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.getElementById('subjectFilter').addEventListener('change', loadHistory);
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  showToast('Ask your administrator to generate a detailed report from the Reports section.', 'info');
+});
+
+loadSubjects();
+loadHistory();
+</script>
+</body>
+</html>

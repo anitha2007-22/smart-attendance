@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan QR — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="student"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <ul class="nav nav-pills justify-content-center mb-4" id="modeTabs">
+            <li class="nav-item"><button class="nav-link active" data-mode="scan"><i class="fa-solid fa-camera me-1"></i>Scan QR</button></li>
+            <li class="nav-item"><button class="nav-link" data-mode="code"><i class="fa-solid fa-keyboard me-1"></i>Enter Code</button></li>
+          </ul>
+
+          <div id="scanMode">
+            <div id="readerWrap" style="border-radius:12px;overflow:hidden;border:1px solid var(--border-color);">
+              <div id="reader" style="width:100%;"></div>
+            </div>
+            <p class="text-secondary small mt-3 text-center">Point your camera at the QR code displayed by your faculty. The code refreshes every few seconds, so scan promptly.</p>
+          </div>
+
+          <div id="codeMode" class="d-none text-center">
+            <p class="text-secondary small mb-3">Can't see the QR from where you're sitting? Ask your faculty to read out the 6-digit code, or check the display.</p>
+            <input
+              type="text"
+              class="form-control text-center mb-3"
+              id="codeInput"
+              inputmode="numeric"
+              maxlength="7"
+              placeholder="000 000"
+              style="font-size:2rem;letter-spacing:0.2em;font-weight:700;max-width:280px;margin:0 auto;"
+            >
+            <button class="btn btn-primary w-100" id="codeSubmitBtn" style="max-width:280px;">
+              <i class="fa-solid fa-paper-plane me-2"></i>Submit Code
+            </button>
+          </div>
+
+          <div class="divider-label mt-4">or paste QR token directly</div>
+          <div class="input-group">
+            <input type="text" class="form-control" id="manualToken" placeholder="Paste QR token text">
+            <button class="btn btn-outline-secondary" id="manualSubmitBtn">Submit</button>
+          </div>
+
+          <div id="resultBox" class="alert mt-3 d-none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'scan', title: 'Mark Attendance' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+let scanner = null;
+let processing = false;
+
+function showResult(message, type) {
+  const box = document.getElementById('resultBox');
+  box.className = `alert mt-3 alert-${type}`;
+  box.textContent = message;
+  box.classList.remove('d-none');
+}
+
+async function submitToken(token) {
+  if (processing) return;
+  processing = true;
+  try {
+    const res = await window.Api.post('/attendance/scan', { qr_token: token });
+    showResult(`Attendance marked as ${res.data.status.toUpperCase()} (Trust Score: ${res.data.trust_score}/100)`, 'success');
+    showToast('Attendance marked successfully');
+    if (scanner) { scanner.pause(true); }
+  } catch (e) {
+    showResult(e.message, 'danger');
+    showToast(e.message, 'error');
+  } finally {
+    setTimeout(() => { processing = false; }, 1500);
+  }
+}
+
+async function submitCode(code) {
+  if (processing) return;
+  processing = true;
+  try {
+    const res = await window.Api.post('/attendance/mark-by-code', { code });
+    showResult(`Attendance marked as ${res.data.status.toUpperCase()} (Trust Score: ${res.data.trust_score}/100)`, 'success');
+    showToast('Attendance marked successfully');
+    document.getElementById('codeInput').value = '';
+  } catch (e) {
+    showResult(e.message, 'danger');
+    showToast(e.message, 'error');
+  } finally {
+    processing = false;
+  }
+}
+
+function initScanner() {
+  try {
+    scanner = new Html5Qrcode('reader');
+    scanner
+      .start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        (decodedText) => submitToken(decodedText)
+      )
+      .catch(() => {
+        document.getElementById('readerWrap').innerHTML =
+          '<div class="empty-state"><i class="fa-solid fa-camera"></i><p>Camera unavailable. Try "Enter Code" instead.</p></div>';
+      });
+  } catch (e) {
+    document.getElementById('readerWrap').innerHTML =
+      '<div class="empty-state"><i class="fa-solid fa-camera"></i><p>Camera unavailable. Try "Enter Code" instead.</p></div>';
+  }
+}
+
+function stopScanner() {
+  if (scanner) {
+    scanner.stop().catch(() => {});
+  }
+}
+
+// ---- Tab switching ----
+document.querySelectorAll('#modeTabs .nav-link').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#modeTabs .nav-link').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const mode = btn.dataset.mode;
+    if (mode === 'scan') {
+      document.getElementById('scanMode').classList.remove('d-none');
+      document.getElementById('codeMode').classList.add('d-none');
+      if (!scanner) initScanner();
+    } else {
+      document.getElementById('scanMode').classList.add('d-none');
+      document.getElementById('codeMode').classList.remove('d-none');
+      document.getElementById('codeInput').focus();
+    }
+  });
+});
+
+// ---- Code input: numeric-only, auto-space formatting ----
+const codeInput = document.getElementById('codeInput');
+codeInput.addEventListener('input', () => {
+  let digits = codeInput.value.replace(/\D/g, '').slice(0, 6);
+  codeInput.value = digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
+});
+codeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('codeSubmitBtn').click();
+});
+
+document.getElementById('codeSubmitBtn').addEventListener('click', () => {
+  const code = codeInput.value.replace(/\D/g, '');
+  if (code.length !== 6) {
+    showResult('Please enter the full 6-digit code', 'warning');
+    return;
+  }
+  submitCode(code);
+});
+
+document.getElementById('manualSubmitBtn').addEventListener('click', () => {
+  const token = document.getElementById('manualToken').value.trim();
+  if (token) submitToken(token);
+});
+
+initScanner();
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Attendance — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="admin"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label">Search Student</label>
+          <div class="input-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" class="form-control" id="searchInput" placeholder="Name or roll no...">
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label">Department</label>
+          <select class="form-select" id="deptFilter"><option value="">All</option></select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label">Subject</label>
+          <select class="form-select" id="subjFilter"><option value="">All</option></select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="statusFilter">
+            <option value="">All</option>
+            <option value="present">Present</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" id="dateFilter">
+        </div>
+        <div class="col-lg-1 col-md-6">
+          <button class="btn btn-light-soft w-100" id="clearBtn" title="Clear filters"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive-card">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr><th>Student</th><th>Subject</th><th>Department</th><th>Date</th><th>Status</th><th>Method</th><th>Trust</th></tr>
+        </thead>
+        <tbody id="tableBody"><tr><td colspan="7" class="text-center py-4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <small class="text-secondary" id="resultsInfo"></small>
+      <div id="paginationContainer"></div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'attendance', title: 'View Attendance' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+let currentPage = 1;
+
+async function loadFilters() {
+  try {
+    const [depts, subjects] = await Promise.all([
+      window.Api.get('/departments', { limit: 100 }),
+      window.Api.get('/subjects', { limit: 200 }),
+    ]);
+    document.getElementById('deptFilter').innerHTML += depts.data.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+    document.getElementById('subjFilter').innerHTML += subjects.data.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  } catch (e) { /* optional */ }
+}
+
+async function loadRecords(page = 1) {
+  currentPage = page;
+  try {
+    const res = await window.Api.get('/attendance/records', {
+      page,
+      limit: 15,
+      search: document.getElementById('searchInput').value.trim(),
+      department_id: document.getElementById('deptFilter').value,
+      subject_id: document.getElementById('subjFilter').value,
+      status: document.getElementById('statusFilter').value,
+      date: document.getElementById('dateFilter').value,
+    });
+
+    const body = document.getElementById('tableBody');
+    if (!res.data.length) {
+      body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><p>No attendance records found</p></div></td></tr>';
+    } else {
+      body.innerHTML = res.data.map((r) => `
+        <tr>
+          <td><div class="d-flex align-items-center gap-2">
+            <span class="avatar-circle">${initials(r.student_name)}</span>
+            <div><div class="fw-semibold">${escapeHtml(r.student_name)}</div><div class="small text-secondary">${escapeHtml(r.roll_no)}</div></div>
+          </div></td>
+          <td>${escapeHtml(r.subject_name)} <span class="text-secondary small">(${escapeHtml(r.subject_code)})</span></td>
+          <td>${escapeHtml(r.department_name)}</td>
+          <td>${formatDate(r.session_date)}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td class="text-uppercase small text-secondary">${r.method}</td>
+          <td>${trustBadge(r.trust_level)} <span class="small text-secondary">${r.trust_score}/100</span></td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('resultsInfo').textContent = `Showing ${res.data.length} of ${res.meta.totalItems} records`;
+    buildPagination(document.getElementById('paginationContainer'), res.meta, loadRecords);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.getElementById('searchInput').addEventListener('input', debounce(() => loadRecords(1)));
+document.getElementById('deptFilter').addEventListener('change', () => loadRecords(1));
+document.getElementById('subjFilter').addEventListener('change', () => loadRecords(1));
+document.getElementById('statusFilter').addEventListener('change', () => loadRecords(1));
+document.getElementById('dateFilter').addEventListener('change', () => loadRecords(1));
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('deptFilter').value = '';
+  document.getElementById('subjFilter').value = '';
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('dateFilter').value = '';
+  loadRecords(1);
+});
+
+(async function init() {
+  await loadFilters();
+  await loadRecords(1);
+})();
+</script>
+</body>
+</html>

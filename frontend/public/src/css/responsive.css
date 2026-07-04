@@ -1,0 +1,85 @@
+/* ==========================================================================
+   Responsive rules — mobile / tablet / laptop / desktop
+   ========================================================================== */
+
+/* Sidebar collapses off-canvas below 992px (tablets & phones) */
+@media (max-width: 991.98px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  .sidebar.show { transform: translateX(0); box-shadow: var(--shadow-lg); }
+
+  .main-content { margin-left: 0; }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1025;
+  }
+  .sidebar-backdrop.show { display: block; }
+
+  .topbar-title { font-size: 1rem; }
+}
+
+/* Phones */
+@media (max-width: 575.98px) {
+  .page-body { padding: 14px; }
+  .topbar { padding: 0 14px; }
+  .stat-card { padding: 16px; }
+  .stat-value { font-size: 1.25rem; }
+  .auth-side { display: none; }
+  .card-body { padding: 14px; }
+  .table thead th, .table tbody td { padding: 10px; font-size: 0.82rem; }
+  .btn { padding: 8px 14px; font-size: 0.82rem; }
+}
+
+/* Tablets */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  .auth-side { display: none; }
+  .page-body { padding: 18px; }
+}
+
+/* Laptop / small desktop */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  :root { --sidebar-width: 230px; }
+}
+
+/* Large desktop */
+@media (min-width: 1600px) {
+  .page-body { max-width: 1600px; margin: 0 auto; width: 100%; }
+}
+
+/* Utility: hide on mobile / show on mobile */
+.d-mobile-none { display: initial; }
+.d-mobile-only { display: none; }
+@media (max-width: 991.98px) {
+  .d-mobile-none { display: none !important; }
+  .d-mobile-only { display: initial !important; }
+}
+
+/* Responsive table wrapper */
+.table-responsive-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Grid helpers for stat cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+@media (max-width: 1199.98px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 575.98px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+}
+@media (max-width: 991.98px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}

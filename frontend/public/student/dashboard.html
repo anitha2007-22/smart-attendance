@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Dashboard — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="student"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div class="row g-3 mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body text-center">
+          <div class="text-secondary small mb-2">Overall Attendance</div>
+          <div style="position:relative;width:160px;height:160px;margin:0 auto;">
+            <canvas id="gaugeChart"></canvas>
+            <div id="gaugeValue" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;">-</div>
+          </div>
+          <div class="mt-3" id="attendanceStatusBadge"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-header">Subject-wise Attendance</div>
+        <div class="card-body"><canvas id="subjectChart" height="120"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Recent Attendance</span>
+          <a href="/student/attendance.html" class="small">View all &rarr;</a>
+        </div>
+        <div class="table-responsive-card">
+          <table class="table table-hover mb-0">
+            <thead><tr><th>Subject</th><th>Date</th><th>Status</th></tr></thead>
+            <tbody id="recentBody"><tr><td colspan="3" class="text-center py-4">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Notifications</span>
+          <a href="#" class="small" onclick="markAllRead(); return false;">Mark all read</a>
+        </div>
+        <div id="notifList" style="max-height:340px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'dashboard', title: 'My Dashboard' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+async function loadDashboard() {
+  try {
+    const pct = await window.Api.get('/analytics/my-percentage');
+    const p = pct.data.percentage;
+    document.getElementById('gaugeValue').textContent = `${p}%`;
+
+    const color = p >= 75 ? '#16a34a' : p >= 60 ? '#d97706' : '#dc2626';
+    new Chart(document.getElementById('gaugeChart'), {
+      type: 'doughnut',
+      data: { datasets: [{ data: [p, 100 - p], backgroundColor: [color, '#e5e7eb'], borderWidth: 0 }] },
+      options: { cutout: '78%', plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+    });
+
+    const badge = document.getElementById('attendanceStatusBadge');
+    badge.innerHTML = p >= 75
+      ? '<span class="badge-soft success">Good Standing</span>'
+      : '<span class="badge-soft danger">Below Required 75%</span>';
+  } catch (e) { showToast(e.message, 'error'); }
+
+  try {
+    const subjectWise = await window.Api.get('/analytics/my-subject-wise');
+    new Chart(document.getElementById('subjectChart'), {
+      type: 'bar',
+      data: {
+        labels: subjectWise.data.map((s) => s.code),
+        datasets: [{ label: 'Attendance %', data: subjectWise.data.map((s) => s.percentage), backgroundColor: '#3b6df6', borderRadius: 6 }],
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } },
+    });
+  } catch (e) { /* optional */ }
+
+  try {
+    const history = await window.Api.get('/attendance/my-history');
+    const body = document.getElementById('recentBody');
+    const recent = history.data.slice(0, 6);
+    if (!recent.length) {
+      body.innerHTML = '<tr><td colspan="3"><div class="empty-state"><i class="fa-solid fa-clipboard"></i><p>No attendance records yet</p></div></td></tr>';
+    } else {
+      body.innerHTML = recent.map((r) => `
+        <tr>
+          <td>${escapeHtml(r.subject_name)}</td>
+          <td>${formatDate(r.session_date)}</td>
+          <td>${statusBadge(r.status)}</td>
+        </tr>`).join('');
+    }
+  } catch (e) { showToast(e.message, 'error'); }
+
+  loadNotifications();
+}
+
+async function loadNotifications() {
+  try {
+    const res = await window.Api.get('/notifications', { limit: 8 });
+    const list = document.getElementById('notifList');
+    if (!res.data.length) {
+      list.innerHTML = '<div class="empty-state"><i class="fa-solid fa-bell"></i><p>No notifications</p></div>';
+      return;
+    }
+    list.innerHTML = res.data.map((n) => `
+      <div class="px-3 py-3 border-bottom d-flex gap-2" style="border-color:var(--border-color) !important;${n.is_read ? '' : 'background:var(--bg-surface-2);'}">
+        <i class="fa-solid fa-circle-info text-primary mt-1"></i>
+        <div>
+          <div class="fw-semibold small">${escapeHtml(n.title)}</div>
+          <div class="text-secondary small">${escapeHtml(n.message)}</div>
+          <div class="text-muted" style="font-size:0.72rem;">${formatDateTime(n.created_at)}</div>
+        </div>
+      </div>`).join('');
+  } catch (e) { /* silent */ }
+}
+
+async function markAllRead() {
+  try {
+    await window.Api.patch('/notifications/read-all');
+    showToast('All notifications marked as read');
+    loadNotifications();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+window.markAllRead = markAllRead;
+
+loadDashboard();
+</script>
+</body>
+</html>

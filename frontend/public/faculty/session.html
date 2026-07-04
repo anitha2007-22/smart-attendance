@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Session — SAMS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/auth/guard.js" data-roles="faculty"></script>
+
+<div id="app-shell-root"></div>
+
+<template id="pageTemplate">
+  <div id="sessionLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="text-secondary mt-3 mb-0">Checking for an active session...</p>
+  </div>
+
+  <div id="noSessionView" class="card d-none">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">Start a New Attendance Session</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Subject</label>
+          <select class="form-select" id="fSubject" required></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Department</label>
+          <select class="form-select" id="fDept" required></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Semester</label>
+          <select class="form-select" id="fSem" required></select>
+        </div>
+      </div>
+      <button class="btn btn-primary mt-4" id="startSessionBtn"><i class="fa-solid fa-play me-2"></i>Start Session</button>
+    </div>
+  </div>
+
+  <div id="activeSessionView" class="d-none">
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="card text-center">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span id="sessionSubjectName">Subject</span>
+            <span class="badge-soft info"><i class="fa-solid fa-circle-dot me-1"></i>LIVE</span>
+          </div>
+          <div class="card-body">
+            <div id="miniDisplayContent">
+              <div class="qr-frame mb-3">
+                <img id="qrImage" src="" alt="QR Code" style="width:220px;height:220px;">
+              </div>
+
+              <div class="mb-3 p-3" style="background:var(--bg-surface-2);border-radius:var(--radius-md);">
+                <div class="text-secondary small mb-1"><i class="fa-solid fa-eye me-1"></i>Can't scan? Read this code aloud</div>
+                <div class="fw-bold" style="font-size:2.6rem;letter-spacing:0.15em;color:var(--brand-600);font-variant-numeric:tabular-nums;" id="shortCodeDisplay">------</div>
+                <div class="text-muted small">Students can type this into "Enter Code" on the Scan page</div>
+              </div>
+
+              <div class="mb-3">
+                <div class="text-secondary small">Refreshes in</div>
+                <div class="fs-3 fw-bold text-primary" id="qrCountdown">--</div>
+              </div>
+            </div>
+
+            <button class="btn btn-outline-secondary w-100 mb-2" onclick="fetchQr()"><i class="fa-solid fa-rotate me-2"></i>Refresh Now</button>
+            <button class="btn btn-primary w-100 mb-2" id="popOutBtn"><i class="fa-solid fa-up-right-from-square me-2"></i>Float in Corner</button>
+            <button class="btn" style="background:var(--danger-100);color:var(--danger-500);width:100%;" id="endSessionBtn">
+              <i class="fa-solid fa-stop me-2"></i>End Session
+            </button>
+          </div>
+        </div>
+        <p class="text-muted small mt-2 text-center d-mobile-none">
+          <i class="fa-solid fa-circle-info me-1"></i>"Float in Corner" keeps the QR + code visible over any app — smart board software, slides, other tabs — while you teach. Chrome/Edge only.
+        </p>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Live Roster <span class="text-secondary small" id="rosterCount"></span></span>
+            <button class="btn btn-sm btn-light-soft" onclick="loadRoster()"><i class="fa-solid fa-rotate"></i></button>
+          </div>
+          <div class="table-responsive-card" style="max-height:480px;overflow-y:auto;">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>Roll No</th><th>Name</th><th>Status</th><th>Trust</th><th class="text-end">Mark</th></tr></thead>
+              <tbody id="rosterBody"><tr><td colspan="5" class="text-center py-4">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script src="/src/js/components/layout.js"></script>
+<script>
+renderLayout({ activePage: 'session', title: 'Attendance Session' });
+document.getElementById('pageBody').appendChild(document.getElementById('pageTemplate').content.cloneNode(true));
+
+let currentSessionId = null;
+let qrTimer = null;
+let countdownTimer = null;
+
+async function loadFormOptions() {
+  const [subjects, depts] = await Promise.all([
+    window.Api.get('/subjects', { limit: 100 }),
+    window.Api.get('/departments', { limit: 100 }),
+  ]);
+  document.getElementById('fSubject').innerHTML = subjects.data.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} (${s.code})</option>`).join('');
+  document.getElementById('fDept').innerHTML = depts.data.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  document.getElementById('fSem').innerHTML = Array.from({ length: 8 }, (_, i) => `<option value="${i + 1}">Semester ${i + 1}</option>`).join('');
+}
+
+document.getElementById('startSessionBtn').addEventListener('click', async () => {
+  try {
+    const res = await window.Api.post('/attendance/sessions/start', {
+      subject_id: parseInt(document.getElementById('fSubject').value, 10),
+      department_id: parseInt(document.getElementById('fDept').value, 10),
+      semester: parseInt(document.getElementById('fSem').value, 10),
+    });
+    currentSessionId = res.data.id;
+    const subjectOpt = document.getElementById('fSubject');
+    document.getElementById('sessionSubjectName').textContent = subjectOpt.options[subjectOpt.selectedIndex].text;
+    showToast('Attendance session started');
+    switchToActiveView();
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+function switchToActiveView() {
+  document.getElementById('noSessionView').classList.add('d-none');
+  document.getElementById('activeSessionView').classList.remove('d-none');
+  fetchQr();
+  loadRoster();
+}
+
+async function fetchQr() {
+  if (!currentSessionId) return;
+  try {
+    const res = await window.Api.get(`/attendance/sessions/${currentSessionId}/qr`);
+    document.getElementById('qrImage').src = res.data.qrImage;
+    document.getElementById('shortCodeDisplay').textContent =
+      res.data.shortCode ? res.data.shortCode.replace(/(\d{3})(\d{3})/, '$1 $2') : '------';
+    startCountdown(res.data.ttlSeconds);
+    clearTimeout(qrTimer);
+    qrTimer = setTimeout(fetchQr, res.data.ttlSeconds * 1000);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/**
+ * Browsers throttle setTimeout/setInterval in background tabs to save
+ * battery/CPU, which can delay the scheduled QR refresh if this tab is
+ * briefly hidden (e.g. faculty switches tabs mid-class). Forcing an
+ * immediate refresh the instant the tab becomes visible again ensures
+ * whatever is on screen is never stale by more than a moment, regardless
+ * of how long the tab was backgrounded.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentSessionId) {
+    fetchQr();
+  }
+});
+
+// ---------------------------------------------------------------
+// Floating "always-on-top" corner display via Document
+// Picture-in-Picture API. This creates a genuine OS-level floating
+// window that stays visible above ANY application — smart board
+// software, presentation tools, other browser tabs — not just other
+// browser tabs. Supported in Chrome/Edge 116+. Falls back gracefully
+// with a message on unsupported browsers (Firefox/Safari as of now).
+// ---------------------------------------------------------------
+let pipWindow = null;
+const popOutBtn = document.getElementById('popOutBtn');
+const miniDisplayContent = document.getElementById('miniDisplayContent');
+const miniDisplayHomeParent = miniDisplayContent.parentElement;
+const miniDisplayHomeNextSibling = miniDisplayContent.nextElementSibling;
+
+function copyStylesInto(targetDocument) {
+  [...document.styleSheets].forEach((styleSheet) => {
+    try {
+      const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('\n');
+      const style = targetDocument.createElement('style');
+      style.textContent = cssRules;
+      targetDocument.head.appendChild(style);
+    } catch (e) {
+      // Cross-origin stylesheet (e.g. Google Fonts) — link it instead
+      if (styleSheet.href) {
+        const link = targetDocument.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = styleSheet.href;
+        targetDocument.head.appendChild(link);
+      }
+    }
+  });
+}
+
+function returnMiniDisplayToPage() {
+  if (miniDisplayHomeNextSibling) {
+    miniDisplayHomeParent.insertBefore(miniDisplayContent, miniDisplayHomeNextSibling);
+  } else {
+    miniDisplayHomeParent.appendChild(miniDisplayContent);
+  }
+}
+
+async function togglePopOut() {
+  if (!('documentPictureInPicture' in window)) {
+    showToast('Floating pop-out needs Chrome or Edge (version 116+). Not supported in this browser.', 'warning');
+    return;
+  }
+
+  if (pipWindow) {
+    pipWindow.close();
+    return;
+  }
+
+  try {
+    pipWindow = await documentPictureInPicture.requestWindow({ width: 300, height: 430 });
+
+    copyStylesInto(pipWindow.document);
+    pipWindow.document.documentElement.setAttribute(
+      'data-theme',
+      document.documentElement.getAttribute('data-theme')
+    );
+    pipWindow.document.body.style.margin = '0';
+    pipWindow.document.body.style.padding = '14px';
+    pipWindow.document.body.style.background = 'var(--bg-body)';
+    pipWindow.document.body.style.fontFamily = 'var(--font-sans)';
+
+    pipWindow.document.body.appendChild(miniDisplayContent);
+
+    popOutBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center me-2"></i>Return to Page';
+    showToast('Floating display opened — drag it to a corner and it stays on top');
+
+    pipWindow.addEventListener('pagehide', () => {
+      returnMiniDisplayToPage();
+      popOutBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square me-2"></i>Float in Corner';
+      pipWindow = null;
+    });
+  } catch (e) {
+    showToast('Could not open floating display: ' + e.message, 'error');
+    pipWindow = null;
+  }
+}
+
+popOutBtn.addEventListener('click', togglePopOut);
+
+function startCountdown(seconds) {
+  clearInterval(countdownTimer);
+  let remaining = seconds;
+  const el = document.getElementById('qrCountdown');
+  el.textContent = `${remaining}s`;
+  countdownTimer = setInterval(() => {
+    remaining -= 1;
+    el.textContent = `${Math.max(remaining, 0)}s`;
+    if (remaining <= 0) clearInterval(countdownTimer);
+  }, 1000);
+}
+
+async function loadRoster() {
+  if (!currentSessionId) return;
+  try {
+    const res = await window.Api.get(`/attendance/sessions/${currentSessionId}/roster`);
+    const body = document.getElementById('rosterBody');
+    document.getElementById('rosterCount').textContent = `(${res.data.roster.length})`;
+
+    body.innerHTML = res.data.roster.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.roll_no)}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${r.status ? statusBadge(r.status) : '<span class="badge-soft warning">Not marked</span>'}</td>
+        <td>${r.trust_level ? trustBadge(r.trust_level) : '-'}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-light-soft me-1" onclick="markStudent(${r.student_id}, 'present')" title="Present"><i class="fa-solid fa-check text-success"></i></button>
+          <button class="btn btn-sm btn-light-soft" onclick="markStudent(${r.student_id}, 'absent')" title="Absent"><i class="fa-solid fa-xmark text-danger"></i></button>
+        </td>
+      </tr>`).join('');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function markStudent(studentId, status) {
+  try {
+    await window.Api.post(`/attendance/sessions/${currentSessionId}/mark-manual`, { student_id: studentId, status });
+    showToast(`Marked as ${status}`);
+    loadRoster();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+document.getElementById('endSessionBtn').addEventListener('click', async () => {
+  if (!confirm('End this attendance session? Unmarked students will be recorded as absent.')) return;
+  try {
+    await window.Api.post(`/attendance/sessions/${currentSessionId}/end`);
+    showToast('Session ended successfully');
+    clearTimeout(qrTimer);
+    clearInterval(countdownTimer);
+    currentSessionId = null;
+    if (pipWindow) pipWindow.close();
+    document.getElementById('activeSessionView').classList.add('d-none');
+    document.getElementById('noSessionView').classList.remove('d-none');
+  } catch (e) { showToast(e.message, 'error'); }
+});
+
+async function checkForActiveSession() {
+  try {
+    const res = await window.Api.get('/attendance/sessions/active');
+    if (res.data) {
+      currentSessionId = res.data.id;
+      document.getElementById('sessionSubjectName').textContent =
+        `${res.data.subject_name} (${res.data.subject_code})`;
+      showToast('Resumed your existing active session');
+      document.getElementById('sessionLoading').classList.add('d-none');
+      switchToActiveView();
+      return true;
+    }
+  } catch (e) { /* no active session, show start form as normal */ }
+
+  document.getElementById('sessionLoading').classList.add('d-none');
+  document.getElementById('noSessionView').classList.remove('d-none');
+  return false;
+}
+
+window.fetchQr = fetchQr;
+window.loadRoster = loadRoster;
+window.markStudent = markStudent;
+
+loadFormOptions();
+checkForActiveSession();
+</script>
+</body>
+</html>
