@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Smart Attendance Monitoring System</title>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/src/css/theme.css" rel="stylesheet">
+<link href="/src/css/responsive.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="auth-wrapper">
+  <div class="auth-side d-mobile-none">
+    <div style="position:relative;z-index:2;">
+      <div class="d-flex align-items-center gap-2 mb-4">
+        <i class="fa-solid fa-user-shield fs-3"></i>
+        <span class="fw-bold fs-4">SAMS</span>
+      </div>
+      <h1 class="fw-bold mb-3" style="font-size:2.2rem;line-height:1.25;">Automated Student<br>Attendance Monitoring<br>&amp; Analytics System</h1>
+      <p class="opacity-75" style="max-width:420px;">QR-based attendance, real-time analytics, attendance integrity scoring, and instant notifications — built for modern colleges.</p>
+      <div class="d-flex gap-4 mt-5">
+        <div>
+          <div class="fs-4 fw-bold">99.8%</div>
+          <div class="small opacity-75">Accuracy</div>
+        </div>
+        <div>
+          <div class="fs-4 fw-bold">&lt;20s</div>
+          <div class="small opacity-75">QR Rotation</div>
+        </div>
+        <div>
+          <div class="fs-4 fw-bold">24/7</div>
+          <div class="small opacity-75">Monitoring</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form-wrap">
+    <div class="auth-card">
+      <div class="text-center mb-4 d-none d-lg-none">
+        <i class="fa-solid fa-user-shield fs-1 text-primary"></i>
+      </div>
+      <h2 class="fw-bold mb-1">Welcome back</h2>
+      <p class="text-secondary mb-4">Sign in to continue to your dashboard</p>
+
+      <div class="alert alert-danger py-2 px-3 small d-none" id="loginError"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="mb-3">
+          <label class="form-label">Email address</label>
+          <input type="email" class="form-control" id="email" placeholder="you@college.edu" required autocomplete="username">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <div class="position-relative">
+            <input type="password" class="form-control" id="password" placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-1 text-secondary" id="togglePwd" style="background:none;border:none;">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2" id="loginBtn">
+          <span id="loginBtnText">Sign In</span>
+          <span class="spinner-border spinner-border-sm d-none" id="loginSpinner"></span>
+        </button>
+      </form>
+
+      <div class="d-none mt-3" id="demoCredentialsBox">
+        <div class="divider-label">Demo credentials</div>
+        <div class="d-flex flex-column gap-2 small">
+          <button type="button" class="btn btn-light-soft text-start" data-demo-email="admin@college.edu" data-demo-pass="Admin@123">
+            <i class="fa-solid fa-user-shield me-2 text-primary"></i>Admin — admin@college.com / Admin@123
+          </button>
+          <button type="button" class="btn btn-light-soft text-start" data-demo-email="anita.sharma@college.edu" data-demo-pass="Faculty@123">
+            <i class="fa-solid fa-chalkboard-user me-2 text-primary"></i>Faculty — sharma@college.com / Faculty@123
+          </button>
+          <button type="button" class="btn btn-light-soft text-start" data-demo-email="aarav.mehta@student.college.edu" data-demo-pass="Student@123">
+            <i class="fa-solid fa-user-graduate me-2 text-primary"></i>Student — aarav@student.college.com / Student@123
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/src/js/utils/theme.js"></script>
+<script src="/src/js/api/client.js"></script>
+<script src="/src/js/utils/helpers.js"></script>
+<script>
+document.getElementById('togglePwd').addEventListener('click', () => {
+  const pwd = document.getElementById('password');
+  const icon = document.querySelector('#togglePwd i');
+  const isPwd = pwd.type === 'password';
+  pwd.type = isPwd ? 'text' : 'password';
+  icon.className = isPwd ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+});
+
+// Demo credentials are completely hidden from the page — no visible
+// button or link anywhere. They can only be revealed by typing the
+// word "demo" anywhere on the page (like a classic cheat code), known
+// only to whoever is running the demo. A modifier-key shortcut like
+// Ctrl+Alt+D was avoided because browsers reserve many Ctrl/Alt
+// combinations (e.g. Ctrl+D = bookmark) and intercept them before
+// page JavaScript ever runs, so this approach is more reliable.
+let secretBuffer = '';
+document.addEventListener('keydown', (e) => {
+  if (e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
+  secretBuffer = (secretBuffer + e.key.toLowerCase()).slice(-4);
+  if (secretBuffer === 'demo') {
+    document.getElementById('demoCredentialsBox').classList.toggle('d-none');
+    secretBuffer = '';
+  }
+});
+
+document.querySelectorAll('[data-demo-email]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.getElementById('email').value = btn.dataset.demoEmail;
+    document.getElementById('password').value = btn.dataset.demoPass;
+  });
+});
+
+// If already logged in, redirect straight to dashboard
+(function () {
+  const user = window.AuthStorage.getUser();
+  const token = window.AuthStorage.getAccessToken();
+  if (user && token) {
+    window.location.href = `/${user.role}/dashboard.html`;
+  }
+})();
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errorBox = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  const btnText = document.getElementById('loginBtnText');
+  const spinner = document.getElementById('loginSpinner');
+
+  errorBox.classList.add('d-none');
+  btn.disabled = true;
+  btnText.textContent = 'Signing in...';
+  spinner.classList.remove('d-none');
+
+  try {
+    const res = await window.Api.post('/auth/login', { email, password });
+    window.AuthStorage.setSession({
+      accessToken: res.data.accessToken,
+      refreshToken: res.data.refreshToken,
+      user: res.data.user,
+    });
+    window.location.href = `/${res.data.user.role}/dashboard.html`;
+  } catch (err) {
+    errorBox.textContent = err.message || 'Login failed. Please check your credentials.';
+    errorBox.classList.remove('d-none');
+    btn.disabled = false;
+    btnText.textContent = 'Sign In';
+    spinner.classList.add('d-none');
+  }
+});
+</script>
+</body>
+</html>
