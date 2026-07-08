@@ -15,7 +15,7 @@ const API_BASE_URL = (() => {
 
   // ===== DEPLOYMENT: replace this URL with your deployed backend's URL =====
   // e.g. 'https://smart-attendance-backend.onrender.com/api/v1'
-  return 'https://REPLACE_WITH_YOUR_RENDER_BACKEND_URL.onrender.com/api/v1';
+  return 'https://smart-attendance-system-8kt4.onrender.com/api/v1';
 })();
 
 const TOKEN_KEYS = {

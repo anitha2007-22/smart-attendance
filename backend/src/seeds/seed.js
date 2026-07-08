@@ -100,11 +100,11 @@ async function seed() {
     // Students
     const studentPw = await hashPw('Student@123');
     const students = [
-      { name: 'Aarav Mehta', email: 'aarav.mehta@student.college.edu', roll: 'CSE21001', dept: cse, sem: 3 },
-      { name: 'Diya Patel', email: 'diya.patel@student.college.edu', roll: 'CSE21002', dept: cse, sem: 3 },
-      { name: 'Kabir Singh', email: 'kabir.singh@student.college.edu', roll: 'CSE21003', dept: cse, sem: 5 },
-      { name: 'Sneha Reddy', email: 'sneha.reddy@student.college.edu', roll: 'ECE21001', dept: ece, sem: 5 },
-      { name: 'Vihaan Joshi', email: 'vihaan.joshi@student.college.edu', roll: 'ECE21002', dept: ece, sem: 5 },
+      { name: 'Aarav ', email: 'aarav@gmail.com', roll: 'CSE21001', dept: cse, sem: 3 },
+      { name: 'Diya ', email: 'diya@gmail.com', roll: 'CSE21002', dept: cse, sem: 3 },
+      { name: 'Sandy', email: 'sandy123@gmail.com', roll: 'CSE21003', dept: cse, sem: 2 },
+      { name: 'Sneha ', email: 'sneha@gmail.com', roll: 'ECE21001', dept: ece, sem: 4},
+      { name: 'Vihaan', email: 'vihaan@gmail.com', roll: 'ECE21002', dept: ece, sem: 5 },
     ];
     for (const s of students) {
       const userRes = await client.query(
