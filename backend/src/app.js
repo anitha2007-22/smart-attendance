@@ -16,18 +16,10 @@ const app = express();
 app.use(helmet());
 
 // CORS - restrict to configured client origin(s)
-const allowedOrigins = env.CLIENT_ORIGIN.split(',').map((o) => o.trim());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: "https://smart-attendance-dusky.vercel.app",
+  credentials: true,
+}));
 
 // Body parsing
 app.use(express.json({ limit: '2mb' }));
