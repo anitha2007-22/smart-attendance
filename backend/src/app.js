@@ -17,7 +17,7 @@ app.use(helmet());
 
 // CORS - restrict to configured client origin(s)
 app.use(cors({
-  origin: "https://smart-attendance-dusky.vercel.app",
+  origin: "https://smart-attendance-h0j65y770-anitha2007-22s-projects.vercel.app",
   credentials: true,
 }));
 
