@@ -1,7 +1,3 @@
-/**
- * Seeds the database with demo data:
- * - 1 admin, 2 departments, 3 faculty, 3 subjects, 5 students, timetable entries
- */
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/db');
 const env = require('../config/env');
@@ -11,9 +7,19 @@ async function hashPw(pw) {
   return bcrypt.hash(pw, env.BCRYPT_SALT_ROUNDS);
 }
 
+async function alreadySeeded() {
+  const res = await pool.query(`SELECT 1 FROM users WHERE email = 'admin@college.edu' LIMIT 1`);
+  return res.rowCount > 0;
+}
+
 async function seed() {
   const client = await pool.connect();
   try {
+    if (await alreadySeeded()) {
+      logger.info('Database already seeded. Skipping.');
+      process.exit(0);
+    }
+
     await client.query('BEGIN');
 
     // Departments
@@ -21,6 +27,7 @@ async function seed() {
       INSERT INTO departments (name, code) VALUES
         ('Computer Science & Engineering', 'CSE'),
         ('Electronics & Communication', 'ECE')
+      ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
       RETURNING id, code;
     `);
     const cse = deptRes.rows.find((d) => d.code === 'CSE').id;
@@ -30,7 +37,8 @@ async function seed() {
     const adminPw = await hashPw('Admin@123');
     await client.query(
       `INSERT INTO users (role, name, email, password_hash, phone)
-       VALUES ('admin', 'System Administrator', 'admin@college.edu', $1, '9999900000')`,
+       VALUES ('admin', 'System Administrator', 'admin@college.edu', $1, '9999900000')
+       ON CONFLICT (email) DO NOTHING`,
       [adminPw]
     );
 
@@ -45,12 +53,16 @@ async function seed() {
     for (const f of facultyUsers) {
       const userRes = await client.query(
         `INSERT INTO users (role, name, email, password_hash, phone)
-         VALUES ('faculty', $1, $2, $3, '9999911111') RETURNING id`,
+         VALUES ('faculty', $1, $2, $3, '9999911111')
+         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
         [f.name, f.email, facultyPw]
       );
       const facRes = await client.query(
         `INSERT INTO faculty (user_id, department_id, designation, employee_code)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (employee_code) DO UPDATE SET designation = EXCLUDED.designation
+         RETURNING id`,
         [userRes.rows[0].id, f.dept, f.desig, f.code]
       );
       facultyIds[f.code] = facRes.rows[0].id;
@@ -66,7 +78,9 @@ async function seed() {
     for (const s of subjects) {
       const res = await client.query(
         `INSERT INTO subjects (name, code, department_id, semester, credits)
-         VALUES ($1, $2, $3, $4, 4) RETURNING id`,
+         VALUES ($1, $2, $3, $4, 4)
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
         [s.name, s.code, s.dept, s.sem]
       );
       subjectIds[s.code] = res.rows[0].id;
@@ -75,7 +89,8 @@ async function seed() {
     // Faculty-Subject assignment
     await client.query(
       `INSERT INTO faculty_subjects (faculty_id, subject_id) VALUES
-        ($1, $2), ($3, $4), ($5, $6)`,
+        ($1, $2), ($3, $4), ($5, $6)
+       ON CONFLICT (faculty_id, subject_id) DO NOTHING`,
       [
         facultyIds.FAC001, subjectIds.CS201,
         facultyIds.FAC002, subjectIds.CS301,
@@ -100,21 +115,24 @@ async function seed() {
     // Students
     const studentPw = await hashPw('Student@123');
     const students = [
-      { name: 'Aarav ', email: 'aarav@gmail.com', roll: 'CSE21001', dept: cse, sem: 3 },
-      { name: 'Diya ', email: 'diya@gmail.com', roll: 'CSE21002', dept: cse, sem: 3 },
+      { name: 'Aarav', email: 'aarav@gmail.com', roll: 'CSE21001', dept: cse, sem: 3 },
+      { name: 'Diya', email: 'diya@gmail.com', roll: 'CSE21002', dept: cse, sem: 3 },
       { name: 'Sandy', email: 'sandy123@gmail.com', roll: 'CSE21003', dept: cse, sem: 2 },
-      { name: 'Sneha ', email: 'sneha@gmail.com', roll: 'ECE21001', dept: ece, sem: 4},
+      { name: 'Sneha', email: 'sneha@gmail.com', roll: 'ECE21001', dept: ece, sem: 4 },
       { name: 'Vihaan', email: 'vihaan@gmail.com', roll: 'ECE21002', dept: ece, sem: 5 },
     ];
     for (const s of students) {
       const userRes = await client.query(
         `INSERT INTO users (role, name, email, password_hash, phone)
-         VALUES ('student', $1, $2, $3, '9999922222') RETURNING id`,
+         VALUES ('student', $1, $2, $3, '9999922222')
+         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
         [s.name, s.email, studentPw]
       );
       await client.query(
         `INSERT INTO students (user_id, roll_no, department_id, semester, batch_year, parent_contact)
-         VALUES ($1, $2, $3, $4, 2021, '9999933333')`,
+         VALUES ($1, $2, $3, $4, 2021, '9999933333')
+         ON CONFLICT (roll_no) DO NOTHING`,
         [userRes.rows[0].id, s.roll, s.dept, s.sem]
       );
     }
@@ -124,7 +142,7 @@ async function seed() {
     logger.info('Demo credentials:');
     logger.info('  Admin:   admin@college.edu / Admin@123');
     logger.info('  Faculty: anita.sharma@college.edu / Faculty@123');
-    logger.info('  Student: aarav.mehta@student.college.edu / Student@123');
+    logger.info('  Student: aarav@gmail.com / Student@123');
     process.exit(0);
   } catch (err) {
     await client.query('ROLLBACK');
