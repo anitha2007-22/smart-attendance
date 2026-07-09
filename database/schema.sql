@@ -147,6 +147,7 @@ CREATE TABLE attendance_sessions (
   status         session_status NOT NULL DEFAULT 'active',
   qr_secret      TEXT,                     -- rotating token base secret
   qr_expires_at  TIMESTAMPTZ,
+  active_short_code VARCHAR(6),
   is_auto_generated BOOLEAN NOT NULL DEFAULT FALSE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
