@@ -1,7 +1,6 @@
 {
-  "rootDir": "frontend",
   "outputDirectory": "frontend/public",
   "rewrites": [
-    { "source": "/src/(.*)", "destination": "/src/$1" }
+    { "source": "/src/(.*)", "destination": "/frontend/src/$1" }
   ]
 }
