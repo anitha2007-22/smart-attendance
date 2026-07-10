@@ -1,8 +1,3 @@
-/* ==========================================================================
-   Responsive rules — mobile / tablet / laptop / desktop
-   ========================================================================== */
-
-/* Sidebar collapses off-canvas below 992px (tablets & phones) */
 @media (max-width: 991.98px) {
   .sidebar {
     transform: translateX(-100%);
@@ -29,16 +24,56 @@
   .topbar { padding: 0 14px; }
   .stat-card { padding: 16px; }
   .stat-value { font-size: 1.25rem; }
-  .auth-side { display: none; }
   .card-body { padding: 14px; }
   .table thead th, .table tbody td { padding: 10px; font-size: 0.82rem; }
   .btn { padding: 8px 14px; font-size: 0.82rem; }
+
+  /* Auth: stack vertically on phones */
+  .auth-wrapper { flex-direction: column; }
+
+  .auth-side {
+    display: flex !important;
+    padding: 28px 20px 24px;
+    min-height: auto;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .auth-side h1 {
+    font-size: 1.4rem !important;
+    line-height: 1.3 !important;
+    margin-bottom: 8px !important;
+  }
+
+  .auth-side p { font-size: 0.82rem; margin-bottom: 0 !important; }
+
+  /* Hide stats row (99.8% / <20s / 24/7) on small screens — too cramped */
+  .auth-side .d-flex.gap-4 { display: none !important; }
+
+  .auth-form-wrap { padding: 24px 16px; }
+  .auth-card { max-width: 100%; }
 }
 
 /* Tablets */
 @media (min-width: 576px) and (max-width: 991.98px) {
-  .auth-side { display: none; }
   .page-body { padding: 18px; }
+
+  /* Auth: stack vertically on tablets too */
+  .auth-wrapper { flex-direction: column; }
+
+  .auth-side {
+    display: flex !important;
+    padding: 32px 28px;
+    min-height: auto;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .auth-side h1 { font-size: 1.7rem !important; }
+  .auth-side .d-flex.gap-4 { margin-top: 20px !important; }
+
+  .auth-form-wrap { padding: 32px 24px; }
+  .auth-card { max-width: 480px; }
 }
 
 /* Laptop / small desktop */
