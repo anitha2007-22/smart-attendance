@@ -76,7 +76,7 @@ async function createStudent(data) {
     const rollCheck = await client.query('SELECT id FROM students WHERE roll_no = $1', [data.roll_no]);
     if (rollCheck.rows[0]) throw new ApiError(409, 'A student with this roll number already exists');
 
-    const plainPassword = data.password || generateTempPassword();
+    const plainPassword = data.password || 'Student@123';
     const passwordHash = await bcrypt.hash(plainPassword, env.BCRYPT_SALT_ROUNDS);
 
     const userRes = await client.query(
@@ -213,7 +213,7 @@ async function createFaculty(data) {
     const codeCheck = await client.query('SELECT id FROM faculty WHERE employee_code = $1', [data.employee_code]);
     if (codeCheck.rows[0]) throw new ApiError(409, 'A faculty member with this employee code already exists');
 
-    const plainPassword = data.password || generateTempPassword();
+    const plainPassword = data.password || 'Faculty@123';
     const passwordHash = await bcrypt.hash(plainPassword, env.BCRYPT_SALT_ROUNDS);
 
     const userRes = await client.query(
