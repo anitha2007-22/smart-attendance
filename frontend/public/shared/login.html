@@ -41,9 +41,6 @@
 
   <div class="auth-form-wrap">
     <div class="auth-card">
-      <div class="text-center mb-4 d-none d-lg-none">
-        <i class="fa-solid fa-user-shield fs-1 text-primary"></i>
-      </div>
       <h2 class="fw-bold mb-1">Welcome back</h2>
       <p class="text-secondary mb-4">Sign in to continue to your dashboard</p>
 
@@ -69,20 +66,31 @@
         </button>
       </form>
 
-      <div class="d-none mt-3" id="demoCredentialsBox">
-        <div class="divider-label">Demo credentials</div>
-        <div class="d-flex flex-column gap-2 small">
-          <button type="button" class="btn btn-light-soft text-start" data-demo-email="admin@college.edu" data-demo-pass="Admin@123">
-            <i class="fa-solid fa-user-shield me-2 text-primary"></i>Admin — admin@college.edu / Admin@123
-          </button>
-          <button type="button" class="btn btn-light-soft text-start" data-demo-email="anita.sharma@college.edu" data-demo-pass="Faculty@123">
-            <i class="fa-solid fa-chalkboard-user me-2 text-primary"></i>Faculty — anita.sharma@college.edu / Faculty@123
-          </button>
-          <button type="button" class="btn btn-light-soft text-start" data-demo-email="aarav@gmail.com" data-demo-pass="Student@123">
-            <i class="fa-solid fa-user-graduate me-2 text-primary"></i>Student — aarav@gmail.com / Student@123
+      <!-- Demo credentials toggle button — visible always, works on mobile -->
+      <div class="mt-3">
+        <div class="divider-label">
+          <button type="button"
+            id="demoToggleBtn"
+            style="background:none;border:none;padding:0;color:var(--text-muted);font-size:0.78rem;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            Demo credentials
+            <i class="fa-solid fa-chevron-down" id="demoChevron" style="font-size:0.65rem;transition:transform 0.2s;"></i>
           </button>
         </div>
+        <div class="d-none mt-2" id="demoCredentialsBox">
+          <div class="d-flex flex-column gap-2 small">
+            <button type="button" class="btn btn-light-soft text-start" data-demo-email="admin@college.edu" data-demo-pass="Admin@123">
+              <i class="fa-solid fa-user-shield me-2 text-primary"></i>Admin — admin@college.edu / Admin@123
+            </button>
+            <button type="button" class="btn btn-light-soft text-start" data-demo-email="anita.sharma@college.edu" data-demo-pass="Faculty@123">
+              <i class="fa-solid fa-chalkboard-user me-2 text-primary"></i>Faculty — anita.sharma@college.edu / Faculty@123
+            </button>
+            <button type="button" class="btn btn-light-soft text-start" data-demo-email="aarav@gmail.com" data-demo-pass="Student@123">
+              <i class="fa-solid fa-user-graduate me-2 text-primary"></i>Student — aarav@gmail.com / Student@123
+            </button>
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
 </div>
@@ -100,23 +108,29 @@ document.getElementById('togglePwd').addEventListener('click', () => {
   icon.className = isPwd ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
 });
 
-// Demo credentials are completely hidden from the page — no visible
-// button or link anywhere. They can only be revealed by typing the
-// word "demo" anywhere on the page (like a classic cheat code), known
-// only to whoever is running the demo. A modifier-key shortcut like
-// Ctrl+Alt+D was avoided because browsers reserve many Ctrl/Alt
-// combinations (e.g. Ctrl+D = bookmark) and intercept them before
-// page JavaScript ever runs, so this approach is more reliable.
+// Toggle demo box on button click (works on mobile)
+document.getElementById('demoToggleBtn').addEventListener('click', () => {
+  const box = document.getElementById('demoCredentialsBox');
+  const chevron = document.getElementById('demoChevron');
+  const isHidden = box.classList.toggle('d-none');
+  chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+});
+
+// Also keep keyboard shortcut for desktop (type "demo")
 let secretBuffer = '';
 document.addEventListener('keydown', (e) => {
   if (e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
   secretBuffer = (secretBuffer + e.key.toLowerCase()).slice(-4);
   if (secretBuffer === 'demo') {
-    document.getElementById('demoCredentialsBox').classList.toggle('d-none');
+    const box = document.getElementById('demoCredentialsBox');
+    const chevron = document.getElementById('demoChevron');
+    const isHidden = box.classList.toggle('d-none');
+    chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
     secretBuffer = '';
   }
 });
 
+// Fill email/password on demo button click
 document.querySelectorAll('[data-demo-email]').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.getElementById('email').value = btn.dataset.demoEmail;
