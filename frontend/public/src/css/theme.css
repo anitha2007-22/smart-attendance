@@ -313,7 +313,7 @@ a { text-decoration: none; }
   background: var(--bg-body);
 }
 .auth-side {
-  flex: 1;
+  flex: 0 0 45%;
   background: radial-gradient(circle at 20% 20%, var(--brand-700), var(--brand-900) 70%);
   color: #fff;
   display: flex;
