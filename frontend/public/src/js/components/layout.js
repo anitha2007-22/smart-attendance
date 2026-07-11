@@ -77,7 +77,7 @@ function renderLayout({ activePage, title }) {
   const root = document.getElementById('app-shell-root');
   root.innerHTML = `
     <div class="app-shell">
-      <div class="sidebar-backdrop d-mobile-only" id="sidebarBackdrop"></div>
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
           <i class="fa-solid fa-user-shield"></i>
