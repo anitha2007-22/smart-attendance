@@ -1,56 +1,115 @@
-# Smart Attendance System — Frontend
+# 🎓 Smart Attendance Monitoring & Analytics System (SAMS)
 
-Pure HTML5 / CSS3 / Vanilla JavaScript (ES6) / Bootstrap 5 / Chart.js. No build step required.
+A full-stack automated student attendance system built with **Node.js**, **PostgreSQL**, and **Vanilla JS** — featuring QR-based attendance, real-time analytics, and role-based dashboards.
 
-## Structure
+## 🚀 Live Demo
+👉 [https://smart-attendance-dusky.vercel.app/shared/login.html](https://smart-attendance-dusky.vercel.app/shared/login.html)
+
+> **Note:** First login may take up to 60 seconds (Render free tier cold start).
+
+### Demo Credentials
+| Role    | Email                        | Password     |
+|---------|------------------------------|--------------|
+| Admin   | admin@college.edu            | Admin@123    |
+| Faculty | anita.sharma@college.edu     | Faculty@123  |
+| Student | aarav@gmail.com              | Student@123  |
+
+---
+
+## ✨ Features
+
+### Admin
+- Dashboard with real-time attendance analytics
+- Manage students, faculty, departments, subjects, timetable
+- View attendance records and generate reports
+- Send notifications to students
+
+### Faculty
+- Start/end attendance sessions with rotating QR codes
+- Manual attendance marking
+- View flagged records and leave requests
+- Export attendance reports (PDF/Excel)
+
+### Student
+- Scan QR code or enter 6-digit code to mark attendance
+- View attendance history and subject-wise breakdown
+- Apply for leave
+- Receive low-attendance notifications
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer     | Technology |
+|-----------|------------|
+| Frontend  | HTML, CSS, Vanilla JS, Bootstrap 5, Chart.js |
+| Backend   | Node.js, Express.js |
+| Database  | PostgreSQL |
+| Auth      | JWT (Access + Refresh tokens) |
+| QR Code   | Rotating JWT-signed QR with 20s TTL |
+| Hosting   | Vercel (Frontend) + Render (Backend) |
+
+---
+
+## 🔐 Security Features
+- Rotating QR codes (expire every 20 seconds)
+- JWT access + refresh token rotation
+- Trust scoring for attendance integrity
+- Rate limiting on auth endpoints
+- XSS protection and security headers (Helmet)
+- CORS restricted to frontend origin
+
+---
+
+## 📁 Project Structure
 ```
-frontend/
-├── public/              <- Serve this folder as your web root
-│   ├── index.html        Redirects to login or dashboard
-│   ├── shared/login.html Unified login for all 3 roles
-│   ├── admin/             Admin portal (10 pages)
-│   ├── faculty/           Faculty portal (6 pages)
-│   ├── student/           Student portal (6 pages)
-│   └── src/                Shared CSS/JS assets (theme, API client, auth guard, layout)
-└── src/                  <- Source copy (mirrored into public/src for serving)
+smart-attendance-system/
+├── frontend/
+│   ├── public/          # HTML pages (admin, faculty, student)
+│   └── src/
+│       ├── css/         # theme.css, responsive.css
+│       └── js/          # API client, components, utilities
+├── backend/
+│   └── src/
+│       ├── config/      # DB, env, constants
+│       ├── modules/     # Auth, attendance, analytics
+│       ├── middleware/  # Auth, rate limiter, error handler
+│       └── migrations/  # DB schema migrations
+└── database/
+    └── schema.sql       # PostgreSQL schema
 ```
 
-## Running locally
+---
 
-Any static file server works. Example:
+## 🚀 Getting Started
 
+### Prerequisites
+- Node.js >= 18
+- PostgreSQL
+
+### Backend Setup
 ```bash
-cd frontend/public
-python3 -m http.server 8080
-# or
-npx serve -l 8080
+cd backend
+npm install
+cp .env.example .env   # fill in your env vars
+npm run migrate
+npm run seed
+npm start
 ```
 
-Then open `http://localhost:8080`.
+### Frontend
+Open `frontend/public/shared/login.html` in a browser or serve with any static server.
 
-## Connecting to the backend
+---
 
-By default the API client points to `http://localhost:5000/api/v1` (see
-`src/js/api/client.js`). To point elsewhere without editing the file, set
-`window.__API_BASE_URL__` before the script loads, e.g. add to `<head>`:
+## 📊 Database Schema
+- `users` — base auth table (admin, faculty, student roles)
+- `students`, `faculty` — role-specific profiles
+- `departments`, `subjects`, `timetable` — academic structure
+- `attendance_sessions` — one per class instance
+- `attendance_records` — individual student attendance
+- `leave_requests`, `notifications`, `audit_logs`
 
-```html
-<script>window.__API_BASE_URL__ = 'https://your-api-domain.com/api/v1';</script>
-```
+---
 
-## Key features implemented
-- **Auth**: JWT login, auto-refresh on 401, role-based route guarding (`data-roles` attribute on the guard script)
-- **Light/Dark mode**: persisted via localStorage, toggle in the topbar
-- **Fully responsive**: sidebar collapses to off-canvas below 992px; stat grids and tables reflow on mobile
-- **Admin**: dashboard, students/faculty/departments/subjects/timetable CRUD, analytics charts, PDF/Excel report downloads, notification broadcast
-- **Faculty**: dashboard, weekly schedule, live attendance session with **rotating QR code** (auto-refreshes per backend TTL), manual roster marking, flagged (low Trust Score) record review, leave approval
-- **Student**: dashboard with attendance gauge + subject chart, **camera-based QR scanner** (html5-qrcode) with manual token fallback, attendance history, timetable, leave application, notifications
-
-## Browser QR Scanning
-Uses `html5-qrcode` (CDN) which requires camera permission and (for non-localhost
-deployments) HTTPS. A manual token-entry fallback is included for demo purposes
-or when camera access isn't available.
-
-## Notes
-- All pages use a shared `renderLayout()` call to inject the sidebar/topbar — see `src/js/components/layout.js`.
-- All list pages follow the same pattern: search/filter → paginated table → modal CRUD form, using `src/js/utils/helpers.js` for badges, toasts, and pagination.
+Made with ❤️ for modern colleges
